@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const MODEL = "gemini-2.5-flash-lite";
-const MAX_RETRIES = 2;
+const MAX_RETRIES = 3;
 
 const MAX_CONTENTS_LENGTH = 50;
 const MAX_TEXT_LENGTH = 5000;
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent`;
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
         },
         signal: controller.signal,
         body: JSON.stringify({
@@ -101,7 +100,7 @@ export async function POST(request: NextRequest) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
 
-        if ([502, 504, 429].includes(response.status) && attempt < MAX_RETRIES) {
+        if ([502, 503, 504, 429].includes(response.status) && attempt < MAX_RETRIES) {
           const delay = 1500 * Math.pow(2, attempt);
           await new Promise(r => setTimeout(r, delay));
           continue;

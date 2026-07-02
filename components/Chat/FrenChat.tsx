@@ -116,7 +116,7 @@ export default function FrenChat() {
                 <div className="dot" />
                 <div className="dot" />
               </div>
-              {isTakingLong && <div className="taking-long">El Fren está pensando...</div>}
+              {isTakingLong && <div className="taking-long">El Fren está escribiendo...</div>}
             </div>
           )}
           <div ref={bottomRef} />
