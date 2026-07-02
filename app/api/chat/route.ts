@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 const MODEL = "gemini-2.5-flash-lite";
 const MAX_RETRIES = 2;
 
+const MAX_CONTENTS_LENGTH = 50;
+const MAX_TEXT_LENGTH = 5000;
+const MAX_BODY_BYTES = 100_000;
+
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -13,9 +17,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  console.log("[API /api/chat] Handler called, key length:", apiKey.length);
+  const contentLength = request.headers.get('content-length');
+  if (contentLength && parseInt(contentLength) > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      { error: { message: "Cuerpo de solicitud demasiado grande" } },
+      { status: 413 }
+    );
+  }
 
-  let body: { contents: unknown[] };
+  let body: { contents?: unknown[] };
   try {
     body = await request.json();
   } catch {
@@ -25,16 +35,57 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const API_URL = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent?key=${apiKey}`;
+  if (!Array.isArray(body.contents) || body.contents.length === 0) {
+    return NextResponse.json(
+      { error: { message: "Se requiere un array 'contents' con al menos un elemento" } },
+      { status: 400 }
+    );
+  }
+
+  if (body.contents.length > MAX_CONTENTS_LENGTH) {
+    return NextResponse.json(
+      { error: { message: `Demasiados mensajes. Máximo: ${MAX_CONTENTS_LENGTH}` } },
+      { status: 400 }
+    );
+  }
+
+  for (const item of body.contents) {
+    if (!item || typeof item !== 'object') {
+      return NextResponse.json(
+        { error: { message: "Cada elemento de contents debe ser un objeto" } },
+        { status: 400 }
+      );
+    }
+    const parts = (item as { parts?: Array<{ text?: string }> }).parts;
+    if (!Array.isArray(parts)) {
+      return NextResponse.json(
+        { error: { message: "Cada elemento de contents debe tener un array 'parts'" } },
+        { status: 400 }
+      );
+    }
+    for (const part of parts) {
+      if (typeof part?.text !== 'string' || part.text.length > MAX_TEXT_LENGTH) {
+        return NextResponse.json(
+          { error: { message: `Cada 'text' en parts debe ser un string de máximo ${MAX_TEXT_LENGTH} caracteres` } },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/${MODEL}:generateContent`;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-      const response = await fetch(API_URL, {
+      const response = await fetch(GEMINI_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
         signal: controller.signal,
         body: JSON.stringify({
           contents: body.contents,

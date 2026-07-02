@@ -10,7 +10,17 @@ const BACHILLERES_VALIDOS = [
   'Informática',
 ];
 
+const MAX_BODY_BYTES_RV = 10_000;
+
 export async function POST(request: NextRequest) {
+  const contentLength = request.headers.get('content-length');
+  if (contentLength && parseInt(contentLength) > MAX_BODY_BYTES_RV) {
+    return NextResponse.json(
+      { error: 'Cuerpo de solicitud demasiado grande' },
+      { status: 413 }
+    );
+  }
+
   try {
     const body = await request.json();
     const { bachiller, choice_confidence } = body;

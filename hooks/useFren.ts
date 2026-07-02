@@ -111,7 +111,7 @@ export const useFren = () => {
       if (!response.ok) {
         const rawText = await response.text().catch(() => "NO_SE_PUDO_LEER_TEXTO");
         console.error(`Status: ${response.status}, Body:`, rawText);
-        let errorData: Record<string, unknown> = {};
+        let errorData: Record<string, any> = {};
         try { errorData = JSON.parse(rawText) } catch { /* not JSON */ }
         console.error("Detalle del error:", errorData);
         throw new Error(errorData?.error?.message || `Error en la API (${response.status})`);
